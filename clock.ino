@@ -37,6 +37,10 @@ void setup()
   enc.setTickMode(AUTO);
 }
 
+void set_timer(){
+
+}
+
 // функция очистки
 void cls()
 {
