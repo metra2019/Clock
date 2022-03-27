@@ -5,7 +5,7 @@
 iarduino_RTC cl(RTC_DS1307);
 
 // подключение дисплея
-#define CLK_DP 2
+#define CLK_DP 5
 #define DIO_DP 4
 GyverTM1637 disp(CLK_DP, DIO_DP);
 
@@ -18,15 +18,31 @@ Encoder enc(CLK_ENC, DT, SW, TYPE2); // для работы c энкодером
 // режимы
 #define CLOCK 0
 #define TIMER 1
+#define SEC 2
+#define CHARGE 3
+#define SETTING
 
 int modes[]
 {
-  CLOCK, TIMER
+  CLOCK, TIMER, SEC, CHARGE
 };
 
 #define COUNT_MODES sizeof(modes) / sizeof(modes[0])
 int mode = CLOCK;
 int t_min = 0, t_sec = 0;
+
+//зуммер
+#define buz 3
+#define FREEQ_TICK 1000
+#define FREEQ_TIME 100
+
+//АКБ
+#define bat_pin A1
+#define K 5./1024
+double lavel_charge = 0;
+
+#define but 2
+int i = 0;
 
 void setup()
 {
@@ -35,10 +51,18 @@ void setup()
   disp.brightness(2);
   cl.begin();
   enc.setTickMode(AUTO);
+
+  mode = 0;
+  disp.point(false);
+  
+  lavel_charge = analogRead(bat_pin)*K / 4.6 * 100;
+  
+  pinMode(but, INPUT_PULLUP);
+  attachInterrupt(0, but_tick, FALLING);
 }
 
-void set_timer(){
-
+void but_tick(){
+  i++;  
 }
 
 // функция очистки
@@ -55,7 +79,24 @@ void timer(int m = 0, int s = 0)
   disp.displayClock(m, s);
 }
 
+void secmer() {
+  static int l_time = 0;
+  disp.point(false);
+
+  if (millis() - l_time > 1000) {
+    l_time = millis();
+    disp.displayInt(i);
+  }
+  if (i > 100) i = 0;
+}
+
+void get_charge() {
+  static long l_time = 0;
+  disp.point(false);
   
+  if (millis() - l_time > 60*000)
+    disp.displayInt(analogRead(bat_pin)*K / 4.6 * 100);
+}
 // индикация времени
 void print_time()
 {
@@ -63,7 +104,7 @@ void print_time()
   disp.point(true);
   cl.gettime();
   // индикация каждую секунду
-  if (millis() - l_time > 1000)
+  if (millis() - l_time > 10000)
   {
     disp.displayClock(cl.Hours, cl.minutes);
     l_time = millis();
@@ -71,8 +112,6 @@ void print_time()
 }
 
 void loop() {
-  // опрос эндокера - автоматический
-  // обработка
   if (enc.isRight()) {
     if (mode == COUNT_MODES - 1)
       mode = 0;
@@ -86,6 +125,9 @@ void loop() {
       mode--;
   }
 
+  if (enc.isPress()) {
+    tone(buz, FREEQ_TICK, FREEQ_TIME);
+  }
   // меню
   switch (mode)
   {
@@ -94,6 +136,12 @@ void loop() {
       break;
     case TIMER:
       timer(); // вызов функции таймера
+      break;
+    case SEC:
+      secmer();
+      break;
+    case CHARGE:
+      get_charge();
       break;
   }
 }
